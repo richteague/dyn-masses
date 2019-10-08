@@ -1,7 +1,7 @@
 import numpy as np
 import yaml
 import os
-from scipy import integrate 
+from scipy import integrate
 from scipy.interpolate import interp1d
 
 
@@ -15,16 +15,24 @@ kB = 1.38064852e-16
 PI = np.pi
 
 
-"""
-Sets up the spatial grid, outputs into appropriate RADMC3D files. 
-Configures AMR_GRID.inp, RADMC3D.inp, LINES.inp.
-"""
+# molecular datafile directory
+mol_dir = 'moldata/'
+
+
 class Grid:
+    """
+    Sets up the spatial grid, outputs into appropriate RADMC3D files.
+    Configures AMR_GRID.inp, RADMC3D.inp, LINES.inp.
+
+    Args:
+        modelname (str): name of the file containing the model parameters in
+            the format ``modelname.yaml``.
+    """
     def __init__(self, modelname):
 
         # open configuration file
         conf = open(modelname+'.yaml')
-        config = yaml.load(conf)
+        config = yaml.load(conf, Loader=yaml.FullLoader)
         conf.close()
         mdir = modelname+'/'
         grid_params = config["grid"]
@@ -42,19 +50,19 @@ class Grid:
 
         # define cell walls and centers
         """ not sure about the centers defined in this way... """
-        self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out), 
+        self.r_walls = np.logspace(np.log10(self.r_in), np.log10(self.r_out),
                                    self.nr+1)
         self.r_centers = 0.5 * (self.r_walls[:-1] + self.r_walls[1:])
 
-    
+
         ### THETA GRID (= zenith angle)
-    
+
         # set a slight offset bound at pole
         po = 0.1
 
         # define cell walls and centers
         """ not sure about the centers defined in this way... """
-        self.theta_walls = 0.5*PI + po - np.logspace(np.log10(po), 
+        self.theta_walls = 0.5*PI + po - np.logspace(np.log10(po),
                            np.log10(0.5*PI+po), self.ntheta+1)[::-1]
         self.theta_centers = 0.5*(self.theta_walls[:-1]+self.theta_walls[1:])
 
@@ -132,29 +140,40 @@ class Grid:
 
         ### LINE DATA CONFIG FILE
         if (conf_params["incl_lines"] == 1):
-           f = open(mdir+'lines.inp', 'w')
-           f.write('2\n1\n')
-           f.write('%s    leiden    0    0    0' % conf_params["molecule"]) 
-           f.close()
+            f = open(mdir+'lines.inp', 'w')
+            f.write('2\n1\n')
+            f.write('%s    leiden    0    0    0' % conf_params["molecule"])
+            f.close()
 
            # copy appropriate molecular data file
-           os.system('cp moldata/'+conf_params["molecule"]+'.dat ' + mdir + \
-                     'molecule_'+conf_params["molecule"]+'.inp')
 
+            molfile = 'moldata/' + conf_params["molecule"] + '.dat'
+            if not os.path.exists(molfile):
+                import wget
+                print("Downloading {}.dat.".format(conf_params["molecule"]))
+                molurl = r'https://home.strw.leidenuniv.nl/~moldata/datafiles/'
+                wget.download(molurl+conf_params["molecule"]+'.dat', molfile)
+            os.system('cp ' + molfile + ' ' + mdir + \
+                      'molecule_'+conf_params["molecule"]+'.inp')
 
 
 class DiskModel:
+    """
+    Define the disk physical structure.
+    """
+
     def __init__(self, modelname):
 
         # open configuration file
         conf = open(modelname+'.yaml')
-        config = yaml.load(conf)
+        config = yaml.load(conf, Loader=yaml.FullLoader)
         conf.close()
         self.mdir = modelname+'/'
         disk_params = config["disk_params"]
         host_params = config["host_params"]
         self.do_dust = config["setup"]["incl_dust"]
         self.do_gas = config["setup"]["incl_lines"]
+        self.molecule = config["setup"]["molecule"]
 
         # stellar properties
         self.Mstar = host_params["M_star"] * Msun
@@ -181,11 +200,16 @@ class DiskModel:
         # non-thermal broadening (as fraction of local sound speed)
         self.xi = disk_params["xi"]
 
+        # velocity components
+        self.incl_vertical = disk_params.get("incl_vertical", True)
+        self.incl_pressure = disk_params.get("incl_pressure", True)
+        self.incl_selfgrav = disk_params.get("incl_selfgrav", False)
+
 
     # DUST SURFACE DENSITY PROFILE
     def Sigma_d(self, r):
         sd = self.Sig0_d * (r / self.R0_d)**(-self.pd1) * \
-             np.exp(-(r / self.R0_d)**self.pd2)    
+             np.exp(-(r / self.R0_d)**self.pd2)
         return sd
 
 
@@ -215,7 +239,7 @@ class DiskModel:
 
     # 2-D TEMPERATURE STRUCTURE
     def Temp(self, r, z):
-        self.z_atm = self.Hp(r) * 4	    # fix "atmosphere" to 4 * Hp
+        self.z_atm = self.Hp(r) * 4   # fix "atmosphere" to 4 * Hp
         Trz =  self.T_atm(r) + (self.T_mid(r) - self.T_atm(r)) * \
                np.cos(PI * z / (2 * self.z_atm))**(2.*self.delta)
         if (z > self.z_atm): Trz = self.T_atm(r)
@@ -239,9 +263,9 @@ class DiskModel:
         return dnorm * np.exp(-0.5 * (z / z_dust)**2)
 
 
-    # 2-D GAS DENSITY STRUCTURE
+    # 2-D GAS DENSITY STRUCTURE IN [???]
     def rho_g(self, r, z):
-    
+
         # set an upper atmosphere boundary
         z_max = 10 * self.z_atm
 
@@ -250,7 +274,7 @@ class DiskModel:
 
         # load temperature gradient
         dlnTdz = self.logTgrad(r, z)
- 
+
         # density gradient
         gz = G * self.Mstar * zvals / (r**2 + zvals**2)**1.5
         dlnpdz = -mu_gas * m_H * gz / (kB * self.Temp(r,z)) - dlnTdz
@@ -261,20 +285,20 @@ class DiskModel:
 
         # normalized densities
         dens = 0.5 * self.Sigma_g(r) * dens0 / integrate.trapz(dens0, zvals)
-        
+
         # interpolator for moving back onto the spatial grid
-        f = interp1d(zvals, np.squeeze(dens), bounds_error=False, 
+        f = interp1d(zvals, np.squeeze(dens), bounds_error=False,
                      fill_value=(np.max(dens), 0))
 
         # properly normalized gas densities
         rho_gas = np.float(f(z))
 
         return rho_gas
- 
+
 
     # 2-D MOLECULAR NUMBER DENSITY STRUCTURE
     def nCO(self, r, z):
-    
+
         rho_gas = self.rho_g(r,z)
         f_CO = 6 * 10.**(-5)
 
@@ -282,25 +306,54 @@ class DiskModel:
 
 
     # GAS VELOCITY STRUCTURE
-    def velocity(self, r):
-    
-        vkep = np.sqrt(G * self.Mstar / r)
+    def velocity(self, r, z):
 
-        return vkep
+        if self.incl_vertical:
+            vkep2 = G * self.Mstar * r**2 / (r**2 + z**2)**1.5
+        else:
+            vkep2 = G * self.Mstar / r
+
+        if self.incl_pressure:
+            vprs2 = self.pressure_support(r, z)
+        else:
+            vprs2 = 0.0
+
+        if self.incl_selfgrav:
+            vgrv2 = 0.0
+        else:
+            vgrv2 = 0.0
+
+        return (vkep2 + vprs2 + vgrv2)**0.5
+
+
+    # PRESSURE SUPPORT FOR GAS VELOCITY
+    def pressure_support(self, r, z):
+
+        rvals = np.array([0.99, 1.0, 1.01]) * r
+        n = np.array([self.rho_g(rr, z) for rr in rvals])
+
+        if n[1] == 0.0:
+            return 0.0
+
+        T = np.array([self.Temp(rr, z) for rr in rvals])
+        dPdr = kB * (n[2] * T[2] - n[0] * T[0]) / (rvals[2] - rvals[0]) / 1e2
+        vprs2 = r * dPdr / n[1] / mu_gas / m_H
+
+        return vprs2
 
 
     # MICROTURBULENCE
     def vturb(self, r, z):
 
         c_s = np.sqrt(kB * self.Temp(r, z) / (mu_gas * m_H))
-        dv = self.xi * c_s   
+        dv = self.xi * c_s
 
         return dv
 
 
     # WRITE OUT RADMC FILES
     def write_Model(self, Grid):
-        
+
         # file headers
         if (self.do_dust == 1):
             dustdens_inp = open(self.mdir+'dust_density.inp', 'w')
@@ -316,7 +369,8 @@ class DiskModel:
             gastemp_inp = open(self.mdir+'gas_temperature.inp', 'w')
             gastemp_inp.write('1\n%d\n' % Grid.ncells)
 
-            codens_inp = open(self.mdir+'numberdens_co.inp', 'w')
+            fn = 'numberdens_{}.inp'.format(self.molecule)
+            codens_inp = open(self.mdir+fn, 'w')
             codens_inp.write('1\n%d\n' % Grid.ncells)
 
             vel_inp = open(self.mdir+'gas_velocity.inp', 'w')
@@ -340,7 +394,7 @@ class DiskModel:
                         gastemp_inp.write('%.6e\n' % self.Temp(r_cyl, z))
                         gasdens_inp.write('%.6e\n' % self.rho_g(r_cyl, z))
                         codens_inp.write('%.6e\n' % self.nCO(r_cyl, z))
-                        vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl))
+                        vel_inp.write('0 0 %.6e\n' % self.velocity(r_cyl, z))
                         turb_inp.write('%.6e\n' % self.vturb(r_cyl, z))
 
         # close files

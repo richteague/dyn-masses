@@ -24,7 +24,7 @@ diskmodel.write_Model(grid)
 
 # extract additional parameters for synthetic observations
 conf = open(modelname+'.yaml')
-pars = yaml.load(conf)
+pars = yaml.load(conf, Loader=yaml.FullLoader)
 conf.close()
 
 
@@ -42,5 +42,5 @@ os.system("radmc3d image incl %.2f posang %.2f " % \
 # make a FITS file
 outfile = modelname+'_'+pars["setup"]["molecule"]+'.fits'
 os.system('rm '+outfile)
-convert_to_fits('image.out', outfile, pars["outputs"]["dpc"], 
+convert_to_fits('image.out', outfile, pars["outputs"]["dpc"],
                 RA=pars["outputs"]["RA"], DEC=pars["outputs"]["DEC"])

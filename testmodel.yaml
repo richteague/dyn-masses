@@ -13,8 +13,9 @@ setup:
     binary: False
     camera_tracemode: 'image'
     lines_mode: 'LTE'
-    molecule: 'co'
+    molecule: '13co'
     transition: 2
+    incl_pressure: 1
 
 disk_params:
     Sig0_d: 0.3 
