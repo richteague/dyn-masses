@@ -145,3 +145,4 @@ class grid:
             # copy appropriate molecular data file
             #os.system('cp moldata/'+conf_params["molecule"]+'.dat ' + self.model_dir + \
             #          'molecule_'+conf_params["molecule"]+'.inp')
+

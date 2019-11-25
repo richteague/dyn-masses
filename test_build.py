@@ -2,7 +2,9 @@ import numpy as np
 import sys
 import os
 import yaml
-import build_structure as model
+#import build_structure as model
+from disk import disk
+from grid import grid
 import matplotlib.pyplot as plt
 from fitsconversion import convert_to_fits
 

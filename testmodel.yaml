@@ -1,9 +1,15 @@
 grid:
-    nr: 128 
-    ntheta: 128 
-    nphi: 1 
-    r_in: 1  
-    r_out: 500 
+    spatial:
+        nr: 128 
+        nt: 128 
+        np: 1 
+        r_min: 1
+        r_max: 500
+        
+    wavelength:
+        nf: 100
+        logf_min: -1.0
+        logf_max: 4.0
 
 setup:
     incl_dust: 0
@@ -17,34 +23,66 @@ setup:
     transition: 2
     incl_pressure: 1
 
-disk_params:
-    Sig0_d: 0.3 
-    R0_d: 50.
-    pd1: 0.5
-    pd2: 2.0
-    Sig0_g: 30.
-    R0_g: 150.
-    pg1: 0.75
-    pg2: 1.5
-    T0_mid: 50.
-    q_mid: 0.5
-    T0_atm: 80.
-    q_atm: 0.5
-    delta: 1.
-    xi: 0.01
-    dustspec: max1mm
-
 host_params: 
     T_eff: 4786 
     R_star: 0.9 
     M_star: 1.32 
 
-outputs:
-    PA: 327.3 
-    incl: 52.7 
-    dpc: 159 
-    widthkms: 2.0
-    nchan: 15
-    npix: 750
-    RA: 165.5
-    DEC: -34.7
+disk_params:
+
+    disk_grid:
+        nr: 250
+        logr: 1
+        rmin: -1.0
+        rmax: 2.5
+        zmin: -1.0
+        nz: 500
+        logz: 1
+        zmin: -1.0
+        zmax: 2.2
+        
+    gas_surface_density:
+        type: 'self_similar'
+        arguments:
+            r0: 150.
+            sig0: 30.
+            pg1: 0.75
+            pg2: 1.50
+
+    dust_surface_density:
+        type: 'powerlaw'
+        arguments:
+            r0: 50.
+            sig0: 0.3
+            pg1: 0.75
+
+    temperature:
+        type: 'dartois'
+        arguments:
+            r0: 30.
+            T0mid: 30.
+            Tqmid: -0.5
+            T0atm: 150.
+            Tqatm: -0.5
+            
+    density:
+        type: 'hydrostatic'
+        
+    abundance:
+        type: 'chemical'
+        arguments:
+            xmol: 0.0001
+            zrmax: 0.15
+            zrmin: 0.10
+            rmin: 10.0
+
+    rotation:
+        type: 'keplerian'
+        arguments:
+            height: 1
+            pressure: 0
+            selfgravity: 0
+
+    delta: 1.
+    xi: 0.01
+    dustspec: max1mm

@@ -1,4 +1,10 @@
-"""Based on code by Sean Andrews (CfA) and Jane Huang (CfA)."""
+"""
+Based on code by Sean Andrews (CfA) and Jane Huang (CfA).
+
+TODO:
+
+    - Check the pressure correction and self-gravity velocities.
+"""
 
 import yaml
 import numpy as np
@@ -43,19 +49,13 @@ class disk:
         assert self.rvals.size == self.nr
 
         # calculate the gas and dust surface densities
-        self.sigma_g = self._parse_function(
-            "surface_density", self.disk_params["gas_surface_density"]
-        )
+        self.sigma_g = self._parse_function("surface_density", self.disk_params["gas_surface_density"])
         assert self.sigma_g.size == self.rvals.size
-        self.sigma_d = self._parse_function(
-            "surface_density", self.disk_params["dust_surface_density"]
-        )
+        self.sigma_d = self._parse_function("surface_density", self.disk_params["dust_surface_density"])
         assert self.sigma_d.size == self.rvals.size
 
         # calculate the (coupled) gas and dust temperatures
-        self.temperature = self._parse_function(
-            "temperature", self.disk_params["temperature"]
-        )
+        self.temperature = self._parse_function("temperature", self.disk_params["temperature"])
         self.temperature = np.clip(self.temperature, self.min_temp, self.max_temp)
         assert self.temperature.shape == (self.zvals.size, self.rvals.size)
         if np.any(self.zpnts[-1] < 4.0 * self.scaleheight()[0]):
@@ -64,8 +64,8 @@ class disk:
         # calculate the gas density structure
         self.density_g = self._parse_function("density", self.disk_params["density"])
         self.density_g = np.clip(self.density_g,
-                                self.min_dens * self.mu * sc.m_p * 1e2,
-                                self.max_dens * self.mu * sc.m_p * 1e2,)
+                                 self.min_dens * self.mu * sc.m_p * 1e2,
+                                 self.max_dens * self.mu * sc.m_p * 1e2,)
         assert self.density_g.shape == self.temperature.shape
 
         # calculate the molecular abundance structure
@@ -256,6 +256,7 @@ class disk:
     # Grid output.
 
     def write_to_grid(self, param, grid):
+            
         """Write ``param`` to the grid."""
         towrite = getattr(self, param)
         return towrite
@@ -316,9 +317,7 @@ class disk:
         toplot = np.log10(toplot / sc.m_p / self.mu)
         yaxis = np.concatenate([-self.zvals[::-1], self.zvals])
         contour_kwargs = {} if contour_kwargs is None else contour_kwargs
-        levels = (
-            np.linspace(toplot.min(), toplot.max(), 20) if levels is None else levels
-        )
+        levels = (np.linspace(toplot.min(), toplot.max(), 20) if levels is None else levels)
         contour_kwargs["linestyles"] = contour_kwargs.pop("linestyles", "-")
         contour_kwargs["linewidths"] = contour_kwargs.pop("linewidths", 1.0)
         contour_kwargs["colors"] = contour_kwargs.pop("colors", "k")
@@ -347,8 +346,7 @@ class disk:
         return fig
 
     def plot_temperature_contours(
-        self, fig=None, levels=None, contour_kwargs=None, full=True
-    ):
+        self, fig=None, levels=None, contour_kwargs=None, full=True):
         """Overplot temperature contours."""
         fig, ax = self._grab_axes(fig)
         toplot = np.vstack([self.temperature[::-1], self.temperature])
@@ -372,19 +370,13 @@ class disk:
         levels = np.linspace(toplot.min(), toplot.max(), 50)
         levels = contourf_kwargs.pop("levels", levels)
         cmap = contourf_kwargs.pop("cmap", "Blues")
-        im = ax.contourf(
-            self.rvals, yaxis, toplot, levels=levels, cmap=cmap, **contourf_kwargs
-        )
+        im = ax.contourf(self.rvals, yaxis, toplot, levels=levels, cmap=cmap, **contourf_kwargs)
 
         cax = make_axes_locatable(ax)
-        cax = cax.append_axes(
-            "right", size="4.5%" if full else "3%", pad="2.25%" if full else "1.5%"
-        )
+        cax = cax.append_axes("right", size="4.5%" if full else "3%", pad="2.25%" if full else "1.5%")
         cb = plt.colorbar(im, cax=cax, ticks=np.arange(-30, 30, 2))
-        cb.set_label(
-            r"$\log_{10}(n_{\rm mol}\,\,[{\rm cm^{-2}}])$", rotation=270, labelpad=15
-        )
-
+        cb.set_label(r"$\log_{10}(n_{\rm mol}\,\,[{\rm cm^{-2}}])$", rotation=270, labelpad=15)
+        
         self._gentrify_structure_ax(ax, full=full)
         return fig
 
